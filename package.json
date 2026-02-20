@@ -1,0 +1,47 @@
+{
+  "name": "@axxr/skills-cli",
+  "version": "1.0.0",
+  "description": "Install AI development skills from GitHub into your editor",
+  "main": "dist/index.js",
+  "bin": {
+    "skills": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --clean",
+    "dev": "tsup src/index.ts --format cjs --watch",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "skills",
+    "ai",
+    "claude",
+    "cursor",
+    "openai",
+    "windsurf",
+    "kmp"
+  ],
+  "author": "Axxr",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Axxr/skills-hub-cli"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/fs-extra": "^11.0.4",
+    "typescript": "^5.3.3",
+    "tsup": "^8.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

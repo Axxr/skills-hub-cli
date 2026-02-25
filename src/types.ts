@@ -63,3 +63,28 @@ export interface PlatformDetectionResult {
   confidence: 'high' | 'medium' | 'low';
   evidence: string[];
 }
+
+// ---------------------------------------------------------------------------
+// SkillInstaller service
+// ---------------------------------------------------------------------------
+
+/** Parámetros de entrada para instalar un skill */
+export interface InstallOptions {
+  repoUrl: string;
+  skillId: string;
+  /** Si se omite, se detecta automáticamente */
+  platform?: Platform;
+  /** Directorio de salida, default '.' */
+  outputDir?: string;
+}
+
+/** Resultado que devuelve SkillInstaller.install() */
+export interface InstallResult {
+  skillName: string;
+  version: string;
+  platform: Platform;
+  outputFile: string;
+  configPath: string;
+  contentHash: string;
+}
+

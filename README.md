@@ -1,165 +1,115 @@
 # Skills CLI
 
-> Install AI development skills across any platform - Claude, Cursor, OpenAI, and more
+> Instala "skills" de IA desde GitHub directamente en tu editor — Claude, Cursor, OpenAI y Windsurf
 
 ## 🚀 Quick Start
 
 ```bash
-# Install globally
-npm install -g @fabio/skills-cli
+# Instalar globalmente
+npm install -g @axxr/skills-cli
 
-# Initialize in your project
-skills init
+# Instalar un skill desde un repositorio GitHub
+skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking
 
-# Install a skill
-skills install android-kmp-banking
-
-# ✅ Done! Your AI now has the skill
+# ✅ ¡Listo! Tu IA ya tiene el skill
 ```
 
-## 📦 Installation
+## 📦 Instalación
 
-### Global Installation (Recommended)
+### Global (recomendado)
 
 ```bash
-npm install -g @fabio/skills-cli
+npm install -g @axxr/skills-cli
 ```
 
-### Local Installation (per project)
+### Local por proyecto
 
 ```bash
-npm install --save-dev @fabio/skills-cli
+npm install --save-dev @axxr/skills-cli
 ```
 
-Then use with npx:
+Con npx:
 ```bash
-npx skills install android-kmp-banking
+npx skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking
 ```
 
-## 🎯 Commands
+## 🎯 Comandos
 
-### `skills init`
+### `skills add <repo-url> --skill <id>`
 
-Initialize skills configuration in your project.
+Descarga e instala un skill desde un repositorio GitHub.
 
 ```bash
-skills init
+# Detección automática de plataforma
+skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking
+
+# Forzar plataforma específica
+skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking --platform cursor
+skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking --platform claude
+
+# Directorio de salida personalizado
+skills add https://github.com/Axxr/skills-hub --skill android-kmp-banking --output ./mi-carpeta
 ```
 
-Creates `.skillsrc.json` with auto-detected platform:
+**Opciones:**
 
-```json
-{
-  "platform": "cursor",
-  "outputPath": ".",
-  "installedSkills": []
-}
+| Opción | Descripción |
+|--------|-------------|
+| `--skill <id>` | **(Requerido)** ID del skill a instalar |
+| `-p, --platform <platform>` | Plataforma destino: `cursor`, `claude`, `openai`, `windsurf` |
+| `-o, --output <path>` | Directorio de salida (default: `.`) |
+
+**Salida:**
 ```
+✓ Detected platform: cursor
+✓ Downloaded: Android KMP Banking v2.1.0
+✓ Integridad verificada: a3f9c2b1d4e5f6a7...
+✓ Transformed
+✓ Installed    android-kmp-banking v2.1.0
+ℹ Platform    : cursor
+ℹ File        : .cursorrules
+ℹ Config      : .skillsrc.json
+```
+
+---
 
 ### `skills list`
 
-List all available skills.
+Lista los skills instalados localmente en el proyecto actual.
 
 ```bash
-# List all skills
 skills list
-
-# Filter by category
-skills list --category mobile
 ```
 
-Output:
+**Salida:**
 ```
-[MOBILE]
+> Installed Skills
 
-  ● Android KMP Banking v2.1.0
-    Complete architecture for banking apps
-    #kotlin #kmp #android #banking
+  ● android-kmp-banking v2.1.0
+     platform : cursor
+     source   : https://github.com/Axxr/skills-hub
+     installed: 25/2/2026
 
-  ● Jetpack Compose UI Patterns v2.0.5
-    Reusable UI components for Compose
-    #android #compose #ui
+ℹ Total: 1 skill(s)
 ```
 
-### `skills search <query>`
+---
 
-Search for skills.
+### `skills remove <skill-id>`
+
+Elimina el archivo generado y borra el skill del registro local.
 
 ```bash
-skills search "kotlin"
-skills search "react"
-skills search "banking"
+skills remove android-kmp-banking
+
+# Si el archivo está en un directorio personalizado
+skills remove android-kmp-banking --output ./mi-carpeta
 ```
 
-### `skills show <skill>`
+## 🎨 Plataformas soportadas
 
-Show detailed information about a skill.
-
-```bash
-skills show android-kmp-banking
-```
-
-Output:
-```
-Android KMP Banking Architecture
-──────────────────────────────────────────────────
-
-ID: android-kmp-banking
-Version: 2.1.0
-Author: Fabio
-Category: mobile
-License: MIT
-
-Description:
-Complete architecture for banking applications...
-
-Tags:
-#kotlin #kmp #android #banking #clean-architecture
-
-Supported Platforms:
-  ✓ cursor
-  ✓ claude
-  ✓ openai
-  ✓ windsurf
-
-Install this skill with:
-  skills install android-kmp-banking
-```
-
-### `skills install <skill>`
-
-Install a skill to your project.
-
-```bash
-# Auto-detect platform
-skills install android-kmp-banking
-
-# Force specific platform
-skills install android-kmp-banking --platform cursor
-skills install android-kmp-banking --platform claude
-
-# Custom output path
-skills install android-kmp-banking --output ./custom/path
-```
-
-Output:
-```
-✓ Detected platform: cursor
-✓ Found: Android KMP Banking v2.1.0
-✓ Skill transformed
-✓ Installed to .cursorrules
-
-Successfully installed Android KMP Banking
-Platform: cursor
-File: .cursorrules
-
-Your AI assistant now has access to this skill! 🎉
-```
-
-## 🎨 Supported Platforms
-
-| Platform | File | Status |
-|----------|------|--------|
+| Plataforma | Archivo generado | Estado |
+|------------|-----------------|--------|
 | **Cursor IDE** | `.cursorrules` | ✅ |
 | **Claude Projects** | `.claude/custom-instructions.md` | ✅ |
 | **OpenAI / GPT** | `gpt-instructions.txt` | ✅ |
@@ -167,52 +117,40 @@ Your AI assistant now has access to this skill! 🎉
 | **Continue.dev** | `.continue/config.json` | 🚧 |
 | **Gemini** | Coming soon | 🔜 |
 
-## 📁 Configuration
+La plataforma se detecta automáticamente buscando archivos de configuración conocidos (`.cursorrules`, `.windsurfrules`, `.claude/`). Si no se detecta ninguna, usa `--platform` para especificarla.
 
-### `.skillsrc.json`
+## 📁 Configuración local — `.skillsrc.json`
+
+Al instalar el primer skill se crea `.skillsrc.json` en el directorio actual:
 
 ```json
 {
-  "platform": "auto",        // or "cursor", "claude", etc.
-  "outputPath": ".",         // where to install skills
-  "registry": "https://...", // optional: custom registry
+  "platform": "auto",
+  "outputPath": ".",
   "installedSkills": [
     {
       "id": "android-kmp-banking",
       "version": "2.1.0",
-      "installedAt": "2025-02-17T10:30:00Z",
-      "platform": "cursor"
+      "source": "https://github.com/Axxr/skills-hub",
+      "installedAt": "2026-02-25T10:30:00Z",
+      "platform": "cursor",
+      "contentHash": "a3f9c2b1...",
+      "contentHashAlgorithm": "sha-256"
     }
   ]
 }
 ```
 
-### Environment Variables
-
-```bash
-# Custom skills directory (default: ~/skills)
-export SKILLS_DIR="/path/to/your/skills"
-
-# Custom registry URL (future)
-export SKILLS_REGISTRY="https://skills.yourcompany.com/api"
-```
-
-## 🏗️ Skill Structure
-
-Each skill is a directory with:
+## 🏗️ Estructura de un skill (en el repositorio remoto)
 
 ```
 android-kmp-banking/
-├── skill.yaml           # Metadata
-├── README.md           # Documentation
-├── rules/              # Rule markdown files
-│   ├── architecture.md
-│   ├── testing.md
-│   └── security.md
-├── examples/           # Code examples
-│   └── mvvm-example/
-└── templates/          # Templates
-    └── feature-template/
+├── skill.yaml           # Metadatos e IDs de plataforma
+├── README.md            # Documentación del skill
+└── rules/               # Archivos markdown con las reglas
+    ├── architecture.md
+    ├── testing.md
+    └── security.md
 ```
 
 ### `skill.yaml`
@@ -221,7 +159,7 @@ android-kmp-banking/
 id: "android-kmp-banking"
 name: "Android KMP Banking Architecture"
 version: "2.1.0"
-author: "Fabio"
+author: "Axxr"
 category: "mobile"
 tags:
   - kotlin
@@ -237,146 +175,60 @@ rules:
 platforms:
   claude:
     enabled: true
-    adapter: "adapters/claude.ts"
   cursor:
     enabled: true
-    adapter: "adapters/cursor.ts"
 ```
 
-## 🔧 How It Works
-
-1. **Detection**: CLI auto-detects your platform (Cursor, Claude, etc.)
-2. **Transform**: Skill is transformed using platform-specific adapter
-3. **Install**: Transformed skill is written to platform's config file
+## 🔧 Cómo funciona
 
 ```
-┌─────────────┐
-│   Skill     │  skill.yaml + rules/*.md
-│  (Generic)  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Adapter    │  Platform-specific transformation
-│  (Cursor)   │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│.cursorrules │  Platform config file
-└─────────────┘
+┌─────────────────────┐
+│  GitHub Repository  │  manifest.json + skill.yaml + rules/*.md
+└──────────┬──────────┘
+           │ GitHubClient (descarga + valida)
+           ▼
+┌─────────────────────┐
+│    Skill (genérico) │  metadatos + contenido de reglas
+└──────────┬──────────┘
+           │ Adapter (transforma según plataforma)
+           ▼
+┌─────────────────────┐
+│  .cursorrules       │  archivo de configuración del editor
+│  .claude/...        │
+│  gpt-instructions   │
+└─────────────────────┘
+           │ ConfigManager
+           ▼
+┌─────────────────────┐
+│  .skillsrc.json     │  registro local de skills instalados
+└─────────────────────┘
 ```
 
-## 🎓 Creating Your Own Skills
+## 🤝 Contribuir
 
-### 1. Create Directory Structure
+Para añadir soporte a una nueva plataforma:
 
-```bash
-mkdir my-skill
-cd my-skill
-```
-
-### 2. Create `skill.yaml`
-
-```yaml
-id: "my-skill"
-name: "My Awesome Skill"
-version: "1.0.0"
-author: "Your Name"
-category: "backend"
-tags:
-  - nodejs
-  - api
-description: "Best practices for Node.js APIs"
-
-rules:
-  - rules/api-design.md
-
-platforms:
-  cursor:
-    enabled: true
-    adapter: "adapters/cursor.ts"
-  claude:
-    enabled: true
-    adapter: "adapters/claude.ts"
-```
-
-### 3. Create Rules
-
-```bash
-mkdir rules
-echo "# API Design Guidelines" > rules/api-design.md
-```
-
-### 4. Add README
-
-```bash
-echo "# My Skill" > README.md
-```
-
-### 5. Place in Skills Directory
-
-```bash
-mv my-skill ~/skills/
-```
-
-### 6. Install It!
-
-```bash
-skills install my-skill
-```
-
-## 📚 Examples
-
-### Android Developer
-
-```bash
-skills install android-kmp-banking
-skills install jetpack-compose-patterns
-skills install kotlin-best-practices
-```
-
-### Backend Developer
-
-```bash
-skills install node-express-api
-skills install database-design
-skills install security-patterns
-```
-
-### Full Stack
-
-```bash
-skills install react-nextjs-modern
-skills install typescript-patterns
-skills install api-integration
-```
+1. Crear `src/adapters/mi-plataforma.ts` extendiendo `BaseAdapter`
+2. Implementar `platform`, `filename` y `transform(skill)`
+3. Registrar en `AdapterFactory` (`src/adapters/index.ts`)
+4. Añadir detección en `PlatformDetector` (`src/detectors/platform-detector.ts`)
 
 ## 🔮 Roadmap
 
-- [ ] Backend API integration
-- [ ] Skill marketplace
-- [ ] Version updates
-- [ ] Skill dependencies resolution
-- [ ] Templates generation
-- [ ] Analytics
+- [ ] Comando `skills search` para explorar skills disponibles en el repositorio remoto
+- [ ] Comando `skills show <id>` para ver detalles de un skill antes de instalarlo
+- [ ] Actualizaciones de versión (`skills update`)
+- [ ] Resolución de dependencias entre skills
+- [ ] Soporte para Continue.dev
+- [ ] Marketplace de skills
 
-## 🤝 Contributing
-
-Contributions are welcome! To add a new platform adapter:
-
-1. Create adapter in `src/adapters/your-platform.ts`
-2. Implement `SkillAdapter` interface
-3. Register in `AdapterFactory`
-4. Update platform detector
-
-## 📄 License
+## 📄 Licencia
 
 MIT
 
-## 👨‍💻 Author
+## 👨‍💻 Autor
 
-Fabio - Banking Mobile Developer
+Axxr
 
 ---
 

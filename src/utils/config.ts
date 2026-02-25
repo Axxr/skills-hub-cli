@@ -20,7 +20,38 @@ export class ConfigManager {
       return this.defaultConfig();
     }
     const content = await fs.readFile(this.configPath, 'utf-8');
-    return JSON.parse(content) as SkillsConfig;
+    return this.parseConfig(content);
+  }
+
+  // [SEC-5] Parseo con validación de schema para evitar fallos silenciosos
+  private parseConfig(content: string): SkillsConfig {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new Error(
+        `El archivo de configuración "${this.configPath}" está corrupto o tiene formato JSON inválido.\n` +
+        `Puedes eliminarlo y volver a ejecutar el comando para regenerarlo.`
+      );
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`"${this.configPath}" no contiene un objeto JSON válido.`);
+    }
+
+    const obj = parsed as Record<string, unknown>;
+
+    // Garantizar que installedSkills siempre sea un array
+    if (!Array.isArray(obj['installedSkills'])) {
+      obj['installedSkills'] = [];
+    }
+
+    // Garantizar que platform tenga un valor de fallback
+    if (typeof obj['platform'] !== 'string') {
+      obj['platform'] = 'auto';
+    }
+
+    return obj as unknown as SkillsConfig;
   }
 
   async save(config: SkillsConfig): Promise<void> {

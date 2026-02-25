@@ -49,9 +49,12 @@ export interface SkillsConfig {
 export interface InstalledSkill {
   id: string;
   version: string;
-  source: string;       // GitHub repo URL
+  source: string;            // GitHub repo URL
   installedAt: string;
   platform: Platform;
+  // [SEC-6] Hash de integridad del contenido instalado
+  contentHash?: string;      // SHA-256 hex del contenido de reglas combinado
+  contentHashAlgorithm?: 'sha-256';
 }
 
 // Platform detection

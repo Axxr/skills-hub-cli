@@ -1,3 +1,11 @@
+import { createHash } from 'crypto';
+import { safeFetch, FETCH_LIMITS } from './safe-fetch';
+import { validateManifest } from './manifest-validator';
+
+// ---------------------------------------------------------------------------
+// Tipos públicos
+// ---------------------------------------------------------------------------
+
 export interface ManifestSkill {
   id: string;
   name: string;
@@ -26,22 +34,77 @@ export interface SkillDownload {
   metadata: ManifestSkill;
   readme: string;
   rulesContent: Record<string, string>;
+  /** SHA-256 del contenido combinado de reglas (SEC-6) */
+  contentHash: string;
 }
 
-function parseOwnerRepo(githubUrl: string): { owner: string; repo: string } {
-  const match = githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-  if (!match) {
-    throw new Error(`Invalid GitHub URL: ${githubUrl}`);
+// ---------------------------------------------------------------------------
+// Helpers internos
+// ---------------------------------------------------------------------------
+
+/** Extrae owner/repo validando que la URL pertenezca a github.com (SEC-3) */
+function parseGitHubUrl(githubUrl: string): { owner: string; repo: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(githubUrl);
+  } catch {
+    throw new Error(`URL de GitHub no válida: ${githubUrl}`);
   }
-  return { owner: match[1], repo: match[2].replace(/\.git$/, '') };
+
+  if (parsed.hostname !== 'github.com') {
+    throw new Error(`[Seguridad] Solo se aceptan URLs de github.com. Recibido: ${parsed.hostname}`);
+  }
+
+  const [owner, repoRaw] = parsed.pathname.replace(/^\//, '').split('/');
+  if (!owner || !repoRaw) {
+    throw new Error(`URL de GitHub con formato incorrecto: ${githubUrl}`);
+  }
+
+  return { owner, repo: repoRaw.replace(/\.git$/, '') };
 }
+
+/** SHA-256 del texto dado en formato hexadecimal (SEC-6) */
+function sha256(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+/** Descarga el texto de una URL; devuelve vacío si la respuesta no es OK */
+async function fetchText(url: string): Promise<string> {
+  const res = await safeFetch(url);
+  return res.ok ? res.text() : '';
+}
+
+/** Extrae la lista `rules:` de un skill.yaml */
+function parseRulesFromYaml(content: string): string[] {
+  const rules: string[] = [];
+  let inRulesBlock = false;
+
+  for (const line of content.split('\n')) {
+    if (/^rules:/.test(line)) { inRulesBlock = true; continue; }
+
+    if (!inRulesBlock) continue;
+
+    const match = line.match(/^\s+-\s+(.+)/);
+    if (match) {
+      rules.push(match[1].trim().replace(/^["']|["']$/g, ''));
+    } else if (line.trim() && !/^\s/.test(line)) {
+      break; // salimos del bloque rules:
+    }
+  }
+
+  return rules;
+}
+
+// ---------------------------------------------------------------------------
+// GitHubClient
+// ---------------------------------------------------------------------------
 
 export class GitHubClient {
-  private rawBase: string;
-  private _repoUrl: string;
+  private readonly rawBase: string;
+  private readonly _repoUrl: string;
 
   constructor(repoUrl: string, branch = 'main') {
-    const { owner, repo } = parseOwnerRepo(repoUrl);
+    const { owner, repo } = parseGitHubUrl(repoUrl);
     this.rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`;
     this._repoUrl = `https://github.com/${owner}/${repo}`;
   }
@@ -52,97 +115,66 @@ export class GitHubClient {
 
   async fetchManifest(): Promise<Manifest> {
     const url = `${this.rawBase}/manifest.json`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch manifest (${res.status}): ${url}`);
-    }
-    return res.json() as Promise<Manifest>;
+    const res = await safeFetch(url);
+    if (!res.ok) throw new Error(`Error al obtener manifest (${res.status}): ${url}`);
+    return validateManifest(await res.json());
   }
 
   async downloadSkill(skillId: string): Promise<SkillDownload> {
     const manifest = await this.fetchManifest();
-    const metadata = manifest.skills.find(s => s.id === skillId);
-
-    if (!metadata) {
-      const available = manifest.skills.map(s => s.id).join(', ');
-      throw new Error(
-        `Skill "${skillId}" not found in manifest.\nAvailable: ${available}`
-      );
-    }
-
-    // Fetch README (optional)
-    let readme = '';
-    try {
-      const res = await fetch(`${this.rawBase}/skills/${skillId}/README.md`);
-      if (res.ok) readme = await res.text();
-    } catch {
-      // README is optional
-    }
-
-    // Fetch skill.yaml to get rules list (manifest may not have it)
+    const metadata = this.findSkill(manifest, skillId);
+    const readme = await this.fetchReadme(skillId);
     const rules = await this.resolveRules(skillId, metadata);
+    const rulesContent = await this.fetchRules(skillId, rules);
+    const contentHash = sha256(Object.values(rulesContent).join('\n'));
 
-    // Fetch all rules in parallel
-    const rulesContent: Record<string, string> = {};
+    return { metadata, readme, rulesContent, contentHash };
+  }
+
+  // ----- private helpers -----
+
+  private findSkill(manifest: Manifest, skillId: string): ManifestSkill {
+    const found = manifest.skills.find(s => s.id === skillId);
+    if (!found) {
+      const available = manifest.skills.map(s => s.id).join(', ');
+      throw new Error(`Skill "${skillId}" no encontrado en el manifest.\nDisponibles: ${available}`);
+    }
+    return found;
+  }
+
+  private async fetchReadme(skillId: string): Promise<string> {
+    try {
+      return await fetchText(`${this.rawBase}/skills/${skillId}/README.md`);
+    } catch {
+      return ''; // README es opcional
+    }
+  }
+
+  private async resolveRules(skillId: string, metadata: ManifestSkill): Promise<string[]> {
+    if (metadata.rules?.length) return metadata.rules;
+
+    try {
+      const yaml = await fetchText(`${this.rawBase}/skills/${skillId}/skill.yaml`);
+      return parseRulesFromYaml(yaml);
+    } catch {
+      return [];
+    }
+  }
+
+  private async fetchRules(skillId: string, rules: string[]): Promise<Record<string, string>> {
+    const limited = rules.slice(0, FETCH_LIMITS.maxRules);
+    if (rules.length > FETCH_LIMITS.maxRules) {
+      console.warn(`[Seguridad] Skill "${skillId}": limitado a ${FETCH_LIMITS.maxRules} reglas`);
+    }
+
+    const content: Record<string, string> = {};
     await Promise.all(
-      rules.map(async rulePath => {
-        const url = `${this.rawBase}/skills/${skillId}/${rulePath}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          rulesContent[rulePath] = await res.text();
-        }
+      limited.map(async rulePath => {
+        try {
+          content[rulePath] = await fetchText(`${this.rawBase}/skills/${skillId}/${rulePath}`);
+        } catch { /* regla individual fallida, continuamos */ }
       })
     );
-
-    return { metadata, readme, rulesContent };
+    return content;
   }
-
-  private async resolveRules(
-    skillId: string,
-    metadata: ManifestSkill
-  ): Promise<string[]> {
-    // If manifest already includes rules list, use it
-    if (metadata.rules && metadata.rules.length > 0) {
-      return metadata.rules;
-    }
-
-    // Otherwise fetch skill.yaml to get rules
-    try {
-      const res = await fetch(
-        `${this.rawBase}/skills/${skillId}/skill.yaml`
-      );
-      if (res.ok) {
-        const yaml = await res.text();
-        return parseRulesFromYaml(yaml);
-      }
-    } catch {
-      // Fall through
-    }
-
-    return [];
-  }
-}
-
-/** Minimal YAML rules parser — extracts the `rules:` list */
-function parseRulesFromYaml(content: string): string[] {
-  const rules: string[] = [];
-  const lines = content.split('\n');
-  let inRules = false;
-
-  for (const line of lines) {
-    if (/^rules:/.test(line)) {
-      inRules = true;
-      continue;
-    }
-    if (inRules) {
-      const match = line.match(/^\s+-\s+(.+)/);
-      if (match) {
-        rules.push(match[1].trim().replace(/^["']|["']$/g, ''));
-      } else if (line.trim() && !/^\s/.test(line)) {
-        break; // Exited rules block
-      }
-    }
-  }
-
-  return rules;
 }

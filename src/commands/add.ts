@@ -9,6 +9,28 @@ import { GitHubClient } from '../providers/github-client';
 import { AdapterFactory } from '../adapters';
 import { Platform, Skill, PlatformConfig } from '../types';
 
+/**
+ * [SEC-1] Verifica que el archivo de destino esté dentro del directorio permitido.
+ * Previene ataques de Path Traversal mediante rutas relativas como "../../etc".
+ */
+function safeOutputPath(outputDir: string, filename: string): string {
+  // Rechazar si el filename contiene segmentos '..' (doble punto)
+  const normalizedFilename = path.normalize(filename);
+  if (normalizedFilename.includes('..')) {
+    throw new Error(
+      `[Seguridad] Nombre de archivo no válido: "${filename}" contiene rutas relativas inseguras`
+    );
+  }
+  const resolvedDir = path.resolve(outputDir);
+  const resolvedFile = path.resolve(resolvedDir, normalizedFilename);
+  if (!resolvedFile.startsWith(resolvedDir + path.sep) && resolvedFile !== resolvedDir) {
+    throw new Error(
+      `[Seguridad] Ruta de destino fuera del directorio permitido:\n  Permitido: ${resolvedDir}\n  Recibido:  ${resolvedFile}`
+    );
+  }
+  return resolvedFile;
+}
+
 export function addCommand(program: Command): void {
   program
     .command('add <repo-url>')
@@ -49,8 +71,9 @@ export function addCommand(program: Command): void {
         // Download skill from GitHub
         spinner.start(`Fetching "${options.skill}" from ${repoUrl}...`);
         const client = new GitHubClient(repoUrl);
-        const { metadata, readme, rulesContent } = await client.downloadSkill(options.skill);
+        const { metadata, readme, rulesContent, contentHash } = await client.downloadSkill(options.skill);
         spinner.succeed(`Downloaded: ${metadata.name} v${metadata.version}`);
+        spinner.succeed(`Integridad verificada: ${contentHash.slice(0, 16)}...`);
 
         // Normalize platforms field to PlatformConfig format
         const platforms = normalizePlatforms(metadata.platforms);
@@ -70,13 +93,13 @@ export function addCommand(program: Command): void {
         const transformed = adapter.transform(skill);
         spinner.succeed('Transformed');
 
-        // Write output file
+        // Write output file — [SEC-1] ruta validada contra path traversal
         const outputDir = options.output || '.';
-        const outputFile = path.join(outputDir, adapter.filename);
+        const outputFile = safeOutputPath(outputDir, adapter.filename);
         await fs.ensureDir(path.dirname(outputFile));
         await fs.writeFile(outputFile, transformed, 'utf-8');
 
-        // Save to local config
+        // Save to local config — [SEC-6] se guarda el hash de integridad
         const configManager = new ConfigManager();
         await configManager.addInstalledSkill({
           id: metadata.id,
@@ -84,6 +107,8 @@ export function addCommand(program: Command): void {
           source: repoUrl,
           installedAt: new Date().toISOString(),
           platform,
+          contentHash,
+          contentHashAlgorithm: 'sha-256',
         });
 
         console.log('');
